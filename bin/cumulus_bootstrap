@@ -17,7 +17,7 @@ from aeon.cumulus.device import Device
 from paramiko import AuthenticationException
 from paramiko.ssh_exception import NoValidConnectionsError
 
-_PROGNAME = 'cumulus-bootstrap'
+_PROGNAME = 'cumulus_bootstrap'
 _PROGVER = '0.0.1'
 _OS_NAME = 'cumulus'
 
