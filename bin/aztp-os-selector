@@ -61,9 +61,11 @@ def cli_parse(cmdargs=None):
 # #####
 # ##### -----------------------------------------------------------------------
 
+
 def exit_results(results, exit_error=None):
     json.dump(results, fp=sys.stdout)
     sys.exit(0 if results['ok'] is True else exit_error or 1)
+
 
 def load_cfg(filepath):
     try:
@@ -82,18 +84,6 @@ def load_cfg(filepath):
                 'error_message': 'YAML syntax error in file: {filepath}, {e}'.format(filepath=filepath, e=e)
             })
 
-
-# def match_dev_key(dev_data, cfg_data):
-#     for fact in dev_data:
-#         for group in cfg_data.keys():
-#             for
-#         for data_key, data_val in cfg_data.iteritems():
-#
-#         matches = filter(
-#             None,
-#             [re.match(pattern=regex, string=fact,
-#                       flags=re.IGNORECASE)
-#              for regex in cfg_data.keys()])
 
 def match_hw_model(dev_data, cfg_data):
     # find entry matching the hw_model
