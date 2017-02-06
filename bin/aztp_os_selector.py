@@ -9,7 +9,7 @@ import operator
 from collections import namedtuple
 from yaml.scanner import ScannerError
 
-_PROGNAME = 'aztp-os-selector'
+_PROGNAME = 'aztp_os_selector'
 
 
 class HwNoMatchError(Exception):

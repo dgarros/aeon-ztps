@@ -279,7 +279,7 @@ def check_os_install(dev):
     profile_dir = os.path.join(g_cli_args.topdir, 'etc', 'profiles', 'default', 'nxos')
     conf_fpath = os.path.join(profile_dir, 'os-selector.cfg')
 
-    cmd = "{topdir}/bin/aztp-os-selector -j '{dev_json}' -c {config}".format(
+    cmd = "{topdir}/bin/aztp_os_selector.py -j '{dev_json}' -c {config}".format(
         topdir=g_cli_args.topdir,
         dev_json=json.dumps(dev.facts),
         config=conf_fpath)
