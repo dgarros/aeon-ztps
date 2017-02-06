@@ -64,7 +64,7 @@ def cli_parse(cmdargs=None):
 
 def exit_results(results, exit_error=None):
     json.dump(results, fp=sys.stdout)
-    sys.exit(0 if results['ok'] is True else exit_error or 1)
+    sys.exit(0 if results['ok'] else exit_error or 1)
 
 
 def load_cfg(filepath):
