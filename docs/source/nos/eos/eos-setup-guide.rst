@@ -90,6 +90,6 @@ If you want to change this configuration, you will need to modify this :literal:
 the necessary Arista software images.
 
 .. warning::
-   The :literal:`bin/eos-bootstrap` program does not check against the attempt to install an OS on an Arista vEOS
+   The :literal:`bin/eos_bootstrap.py` program does not check against the attempt to install an OS on an Arista vEOS
    system. Therefore it is your responsibility to ensure that if you are using vEOS, that the correct version
    is set in the :literal:`os-selector.cfg` file.
