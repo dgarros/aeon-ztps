@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-# nxos-bootstrap
-
 import sys
 import os
 import json
@@ -10,15 +8,15 @@ import subprocess
 import logging
 import time
 import requests
+import yaml
 
-import aeon.nxos as nxos
-import aeon.nxos.exceptions as NxExc
+from aeon.eos.device import Device
 from aeon.exceptions import ProbeError, UnauthorizedError
+from aeon.exceptions import ConfigError, CommandError
 
-_OS_NAME = 'nxos'
+_OS_NAME = 'eos'
 _PROGNAME = '%s-bootstrap' % _OS_NAME
 _PROGVER = '0.0.1'
-
 
 # ##### -----------------------------------------------------------------------
 # #####
@@ -41,7 +39,7 @@ psr.add_argument(
 
 psr.add_argument(
     '--topdir', required=True,
-    help='Aeon ZTP server installation directory')
+    help='toplevel directory aztp installation files')
 
 psr.add_argument(
     '--logfile',
@@ -77,7 +75,6 @@ group.add_argument(
     required=True,
     help='Passwd environment variable')
 
-
 g_cli_args = psr.parse_args()
 g_self_server = g_cli_args.server
 
@@ -100,6 +97,32 @@ def setup_logging(logname, logfile, target):
 g_log = setup_logging(logname=_PROGNAME,
                       logfile=g_cli_args.logfile,
                       target=g_cli_args.target)
+
+
+# ##### -----------------------------------------------------------------------
+# #####
+# #####                           REST API functions
+# #####
+# ##### -----------------------------------------------------------------------
+
+def post_device_facts(dev):
+    requests.put(
+        url='http://%s/api/devices/facts' % g_self_server,
+        json=dict(
+            ip_addr=dev.target,
+            serial_number=dev.facts['serial_number'],
+            hw_model=dev.facts['hw_model'],
+            os_version=dev.facts['os_version'],
+            os_name=_OS_NAME))
+
+
+def post_device_status(dev=None, target=None, message=None, state=None):
+    requests.put(
+        url='http://%s/api/devices/status' % g_self_server,
+        json=dict(
+            os_name=_OS_NAME,
+            ip_addr=target or dev.target,
+            state=state, message=message))
 
 
 # ##### -----------------------------------------------------------------------
@@ -149,73 +172,36 @@ def wait_for_device(countdown, poll_delay):
         g_log.info(msg)
 
         try:
-            dev = nxos.Device(
-                target, user=user, passwd=passwd, timeout=poll_delay)
+            dev = Device(target, user=user, passwd=passwd, timeout=poll_delay)
+
+        except CommandError:
+            # this means that the device is probe-able, but unable to use the API
+            # for some reason; likely the process is not yet ready.  need to
+            # 'manually' invoke the poll delay.
+            countdown -= poll_delay
+            if countdown <= 0:
+                exit_results(dev=dev, results=dict(
+                    ok=False,
+                    error_type='login',
+                    message='Failed to access %s device API within reload countdown' % target))
+            time.sleep(poll_delay)
 
         except ProbeError:
             countdown -= poll_delay
             if countdown <= 0:
-                exit_results(dict(
+                exit_results(dev=dev, results=dict(
                     ok=False,
                     error_type='login',
                     message='Failed to probe target %s within reload countdown' % target))
 
         except UnauthorizedError:
-            errmsg = 'Unauthorized - check user={}/passwd={}'.format(user, passwd)
-            g_log.error(errmsg)
-            exit_results(target=target, results=dict(
-                ok=False, error_type='login', message=errmsg))
+            exit_results(dev=dev, results=dict(
+                ok=False,
+                error_type='login',
+                message='Unauthorized - check user/password'))
 
     post_device_facts(dev)
-
-    msg = 'device reachable, waiting for System ready'
-    post_device_status(dev=dev, state='AWAIT-SYSTEM-READY', message=msg)
-    g_log.info(msg)
-
-    while countdown >= 0:
-        msg = 'ready-countdown at: {} seconds'.format(countdown)
-        post_device_status(dev=dev, message=msg)
-        g_log.info(msg)
-
-        try:
-            dev.api.exec_opcmd('delete volatile:system_ready', msg_type='cli_show_ascii')
-            return dev
-        except NxExc.CommandError:
-            # means that the file does not exist yet, so wait some time
-            # and try again
-            time.sleep(poll_delay)
-            countdown -= poll_delay
-
-    exit_results(target=target, results=dict(
-        ok=False,
-        error_type='login',
-        message='%s failed to find "System ready" within reload countdown' % target))
-
-
-# ##### -----------------------------------------------------------------------
-# #####
-# #####                           REST API functions
-# #####
-# ##### -----------------------------------------------------------------------
-
-def post_device_facts(dev):
-    requests.put(
-        url='http://%s/api/devices/facts' % g_self_server,
-        json=dict(
-            ip_addr=dev.target,
-            serial_number=dev.facts['serial_number'],
-            hw_model=dev.facts['hw_model'],
-            os_version=dev.facts['os_version'],
-            os_name=_OS_NAME))
-
-
-def post_device_status(dev=None, target=None, message=None, state=None):
-    requests.put(
-        url='http://%s/api/devices/status' % g_self_server,
-        json=dict(
-            os_name=_OS_NAME,
-            ip_addr=target or dev.target,
-            state=state, message=message))
+    return dev
 
 
 # ##### -----------------------------------------------------------------------
@@ -224,9 +210,9 @@ def post_device_status(dev=None, target=None, message=None, state=None):
 # #####
 # ##### -----------------------------------------------------------------------
 
-def do_push_config1(dev):
+def do_push_config(dev):
     topdir = g_cli_args.topdir
-    config_dir = os.path.join(topdir, 'etc', 'configs', 'nxos')
+    config_dir = os.path.join(topdir, 'etc', 'configs', _OS_NAME)
     all_fpath = os.path.join(config_dir, 'all.conf')
     model_fpath = os.path.join(config_dir, dev.facts['hw_model'] + '.conf')
     changed = False
@@ -238,31 +224,33 @@ def do_push_config1(dev):
     try:
         if os.path.isfile(all_fpath):
             g_log.info('reading from: {}'.format(all_fpath))
-            conf = open(all_fpath).read()
+            conf = open(all_fpath).read().split('\n')
             g_log.info('pushing all config to device')
-            dev.api.exec_config(conf)
+            dev.api.configure(conf)
             changed = True
         else:
             g_log.info('no all.conf file found')
 
         if os.path.isfile(model_fpath):
             g_log.info('reading model config from: {}'.format(model_fpath))
-            conf = open(model_fpath).read()
+            conf = open(model_fpath).read().split('\n')
             g_log.info('pushing model config to device')
-            dev.api.exec_config(conf)
+            dev.api.configure(conf)
             changed = True
         else:
             g_log.info('no model config file found: {}'.format(model_fpath))
 
-    except NxExc.NxosException as exc:
-        g_log.critical("unable to push config: {}".format(exc.message))
+    except ConfigError as exc:
+        errmsg = str(exc.exc)
+        g_log.critical("unable to push config: {}".format(errmsg))
         exit_results(dict(
             ok=False,
             error_type='config',
-            message=exc.message))
+            message=errmsg))
 
     if changed is True:
-        dev.api.exec_config("copy run start")
+        dev.api.execute(['enable', 'copy running-config startup-config'])
+        g_log.info('config completed OK.')
 
 
 # ##### -----------------------------------------------------------------------
@@ -270,21 +258,6 @@ def do_push_config1(dev):
 # #####                           OS install process
 # #####
 # ##### -----------------------------------------------------------------------
-
-def check_os_install(dev):
-    profile_dir = os.path.join(g_cli_args.topdir, 'etc', 'profiles', 'default', 'nxos')
-    conf_fpath = os.path.join(profile_dir, 'os-selector.cfg')
-
-    cmd = "{topdir}/bin/aztp-os-selector -j '{dev_json}' -c {config}".format(
-        topdir=g_cli_args.topdir,
-        dev_json=json.dumps(dev.facts),
-        config=conf_fpath)
-
-    child = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-
-    _stdout, _stderr = child.communicate()
-    return json.loads(_stdout)
-
 
 def ensure_md5sum(filepath):
     md5sum_fpath = filepath + ".md5"
@@ -303,7 +276,38 @@ def ensure_md5sum(filepath):
     return rd_md5sum()
 
 
+def check_os_install(dev):
+    profile_dir = os.path.join(g_cli_args.topdir, 'etc', 'profiles', 'default', _OS_NAME)
+    conf_fpath = os.path.join(profile_dir, 'os-selector.cfg')
+
+    cmd = "{topdir}/bin/aztp_os_selector.py -j '{dev_json}' -c {config}".format(
+        topdir=g_cli_args.topdir,
+        dev_json=json.dumps(dev.facts),
+        config=conf_fpath)
+
+    g_log.info('os-select: [%s]' % cmd)
+
+    child = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+
+    _stdout, _stderr = child.communicate()
+    g_log.info('os-select rc={}, stdout={}'.format(child.returncode, _stdout))
+    g_log.info('os-select stderr={}'.format(_stderr))
+
+    try:
+        results = json.loads(_stdout)
+
+    except Exception as exc:
+        errmsg = 'Unable to load os-select output as JSON: {}'.format(_stdout)
+        exit_results(dev=dev, results=dict(
+            ok=False,
+            error_type='config',
+            message=errmsg))
+
+    return results
+
+
 def do_os_install(dev, image_name):
+
     vendor_dir = os.path.join(g_cli_args.topdir, 'vendor_images', _OS_NAME)
     image_fpath = os.path.join(vendor_dir, image_name)
 
@@ -318,46 +322,92 @@ def do_os_install(dev, image_name):
     msg = 'installing OS image [{}] ... please be patient'.format(image_name)
     post_device_status(dev=dev, state='OS-INSTALL', message=msg)
 
-    cmd = "nxos-installos --target {target} --server {server} " \
-          "-U {u_env} -P {p_env} --image {image} --md5sum {md5sum}".format(
-            target=dev.target, server=g_cli_args.server,
-            u_env=g_cli_args.env_user, p_env=g_cli_args.env_passwd,
-            image=image_name, md5sum=md5sum)
+    msg = 'installing OS image [{}] ... please be patient'.format(image_name)
+    g_log.info(msg)
+    post_device_status(dev=dev, state='OS-INSTALL', message=msg)
 
-    if g_cli_args.logfile:
-        cmd += ' --logfile %s' % g_cli_args.logfile
+    # --------------------------------
+    # check for file already on device
+    # --------------------------------
 
-    child = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-    _stdout, _stderr = child.communicate()
-    return json.loads(_stdout)
+    try:
+        dev.api.execute('dir flash:%s' % image_name)
+        g_log.info('file already exists on device, skipping copy.')
+        has_file = True
+    except CommandError:
+        has_file = False
 
+    def do_copy_file():
+        # -------------------------
+        # copy image file to device
+        # -------------------------
 
-def do_ensure_os_version(dev):
-    os_install = check_os_install(dev)
+        cmds = ['routing-context vrf {}'.format(dev.api.VRF_MGMT),
+                'copy http://{server}/images/{OS}/{filename} flash:'
+                .format(server=g_self_server, OS=_OS_NAME,
+                        filename=image_name)]
 
-    if not os_install['image']:
-        g_log.info('no software install required')
-        return dev
+        try:
+            dev.api.execute(cmds)
+            g_log.info('copy OS image file completed.')
 
-    g_log.info('software image install required: %s' % os_install['image'])
+        except Exception as exc:
+            errmsg = "Unable to copy file to device: %s" % str(exc)
+            g_log.error(errmsg)
+            exit_results(dev=dev, results=dict(
+                ok=False,
+                error_type='install',
+                message=errmsg))
 
-    got = do_os_install(dev, image_name=os_install['image'])
-    if not got['ok']:
-        errmsg = 'software install [{ver}] FAILED: {reason}'.format(
-                 ver=os_install['image'], reason=json.dumps(got))
-        g_log.critical(errmsg)
-        exit_results(dict(
+    if not has_file:
+        do_copy_file()
+
+    # -------------------
+    # verify MD5 checksum
+    # -------------------
+
+    got_md5 = dev.api.execute('verify /md5 flash:{}'.format(image_name))
+    has_md5 = got_md5['messages'][0].split('=')[-1].strip()
+    if has_md5 != md5sum:
+        errmsg = 'image file {filename} MD5 mismatch has={has} should={should}' \
+            .format(filename=image_name,
+                    has=has_md5, should=md5sum)
+
+        g_log.error(errmsg)
+        exit_results(dev=dev, results=dict(
             ok=False,
             error_type='install',
             message=errmsg))
 
-    g_log.info('software install OK: %s' % json.dumps(got))
+    g_log.info('md5sum checksum OK.')
+
+    # ---------------------------------------------
+    # configure to use this version for system boot
+    # ---------------------------------------------
+
+    dev.api.configure(['boot system flash:%s' % image_name])
+    dev.api.execute('copy running-config status-config')
+
+
+def do_ensure_os_version(dev):
+    os_install = check_os_install(dev)
+    image_name = os_install['image']
+    if not image_name:
+        g_log.info('no software install required')
+        return dev
+
+    g_log.info('software image install required: %s' % image_name)
+    do_os_install(dev, image_name=image_name)
+
+    g_log.info('software install OK')
     g_log.info('rebooting device ... please be patient')
 
     post_device_status(
         dev, state='REBOOTING',
-        message='OS install OK, rebooting ... please be patient')
+        message='OS install %s completed, now rebooting'
+                ' ... please be patient' % image_name)
 
+    dev.api.execute('reload now')
     time.sleep(g_cli_args.init_delay)
     return wait_for_device(countdown=g_cli_args.reload_delay, poll_delay=10)
 
@@ -383,17 +433,13 @@ def main():
         state='START',
         message='bootstrap started, waiting for device access')
 
-    # first wait the init_delay amount of time ... gives the device time
-    # to start the shutdown process; i.e. expect this script to be kicked
-    # off from the NXOS POAP process.
-
     time.sleep(g_cli_args.init_delay)
     dev = wait_for_device(countdown=g_cli_args.reload_delay, poll_delay=10)
 
     g_log.info("proceeding with bootstrap")
 
-    do_push_config1(dev)
-    dev = do_ensure_os_version(dev)
+    do_push_config(dev)
+    do_ensure_os_version(dev)
 
     g_log.info("bootstrap process finished")
     exit_results(dict(ok=True), dev=dev)
