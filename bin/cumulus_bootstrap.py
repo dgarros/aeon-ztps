@@ -407,11 +407,8 @@ def ensure_os_version(dev):
 # ##### -----------------------------------------------------------------------
 
 def main():
-    cli_args = cli_parse()
-    self_server = cli_args.server
-    cboot = CumulusBootstrap(self_server, cli_args)
-    if not os.path.isdir(cli_args.topdir):
-        cboot.exit_results(dict(
+    if not os.path.isdir(g_cli_args.topdir):
+        exit_results(dict(
             ok=False,
             error_type='args',
             message='{} is not a directory'.format(g_cli_args.topdir)))
@@ -435,24 +432,6 @@ def main():
         ensure_os_version(dev)
     g_log.info("bootstrap process finished")
     exit_results(dict(ok=True), dev=dev)
-    cboot.log.info("bootstrap init-delay: {} seconds"
-                  .format(cli_args.init_delay))
-
-    cboot.post_device_status(
-        target=cli_args.target,
-        state='START',
-        message='bootstrap started, waiting for device access')
-
-    time.sleep(cli_args.init_delay)
-    dev = cboot.wait_for_device(countdown=cli_args.reload_delay, poll_delay=10, msg='Waiting for device access')
-
-    cboot.log.info("proceeding with bootstrap")
-
-    cboot.ensure_os_version(dev)
-
-    cboot.log.info("bootstrap process finished")
-    cboot.exit_results(dict(ok=True), dev=dev)
-
 
 if '__main__' == __name__:
     main()
