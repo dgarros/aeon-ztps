@@ -7,7 +7,6 @@ import os
 import aeon_ztp
 import aeon_ztp.api.models as models
 import pytest
-import yaml
 from aeon_ztp import create_app
 from datetime import datetime
 from sqlalchemy.orm.exc import ObjectDeletedError
