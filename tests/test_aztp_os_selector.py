@@ -1,3 +1,4 @@
+import imp
 import os
 import yaml
 import tempfile
@@ -8,35 +9,30 @@ import copy
 from bin import aztp_os_selector
 from collections import namedtuple
 
-g_dev_data = {
-    'os_name': 'cumulus-vx',
-    'vendor': 'cumulus',
-    'hw_part_number': '1234',
-    'hostname': 'cumulus',
-    'fqdn': 'cumulus.localhost',
-    'virtual': True,
-    'service_tag': '1234',
-    'os_version': '3.1.1',
-    'hw_version': '1234',
-    'mac_address': '0123456789012',
-    'serial_number': '09786554',
-    'hw_model': 'cvx1000'
-}
+g_dev_data = {'os_name': 'cumulus-vx',
+            'vendor': 'cumulus',
+            'hw_part_number': '1234',
+            'hostname': 'cumulus',
+            'fqdn': 'cumulus.localhost',
+            'virtual': True,
+            'service_tag': '1234',
+            'os_version': '3.1.1',
+            'hw_version': '1234',
+            'mac_address': '0123456789012',
+            'serial_number': '09786554',
+            'hw_model': 'cvx1000'}
 
-g_cfg_data = {
-    'default': {
-        'regex_match': '3\.1\.[12]',
-        'image': 'CumulusLinux-3.1.2-amd64.bin'
-    },
-    'group_a': {
-        'regex_match': '3\.1\.[12]',
-        'image': 'CumulusLinux-3.1.2-amd64.bin',
-        'matches': {
-            'hw_model': ['cvx1000'],
-            'mac_address': ['0123456789012', '2109876543210']
-        }
-    }
-}
+g_cfg_data = {'default': {
+                          'regex_match': '3\.1\.[12]',
+                          'image': 'CumulusLinux-3.1.2-amd64.bin'},
+              'group_a': {'regex_match': '3\.1\.[12]',
+                          'image': 'CumulusLinux-3.1.2-amd64.bin',
+                          'matches': {
+                                      'hw_model': ['cvx1000'],
+                                      'mac_address': ['0123456789012', '2109876543210']
+                                      }
+                         }
+              }
 
 
 def os_sel_file(contents=None):
@@ -63,7 +59,7 @@ def test_cli_parse():
 def test_cli_parse_parsererror():
     osf = os_sel_file()
     with pytest.raises(aztp_os_selector.ArgumentParser.ParserError) as e:
-        aztp_os_selector.cli_parse(['-c', osf.name])
+        parse = aztp_os_selector.cli_parse(['-c', osf.name])
     assert 'ParserError' in str(e)
 
 
@@ -98,7 +94,7 @@ def test_load_nonexistent_cfg():
     old_stdout = sys.stdout
     sys.stdout = open(os.devnull, "w")
     try:
-        aztp_os_selector.load_cfg('filename_that_does_not_exist')
+        cfg = aztp_os_selector.load_cfg('filename_that_does_not_exist')
     except SystemExit as e:
         pass
     finally:
@@ -118,7 +114,7 @@ def test_load_cfg_bad_syntax():
     old_stdout = sys.stdout
     sys.stdout = open(os.devnull, "w")
     try:
-        aztp_os_selector.load_cfg(os_sel.name)
+        cfg = aztp_os_selector.load_cfg(os_sel.name)
     except SystemExit as e:
         pass
     finally:
@@ -148,7 +144,7 @@ def test_match_hw_model_no_default():
     new_cfg_data = copy.deepcopy(g_cfg_data)
     new_cfg_data.pop('default')
     try:
-        aztp_os_selector.match_hw_model(new_dev_data, new_cfg_data)
+        match = aztp_os_selector.match_hw_model(new_dev_data, new_cfg_data)
     except aztp_os_selector.HwNoMatchError as e:
         pass
     assert isinstance(e, aztp_os_selector.HwNoMatchError)
@@ -156,16 +152,15 @@ def test_match_hw_model_no_default():
 
 def test_match_hw_model_multi_match():
     new_cfg_data = copy.deepcopy(g_cfg_data)
-    new_cfg_data['group_b'] = {
-        'regex_match': '3\.1\.[12]',
-        'image': 'CumulusLinux-3.1.2-amd64.bin',
-        'matches': {
-            'hw_model': ['cvx1000'],
-            'mac_address': ['0123456789012', '2109876543210']
-        }
-    }
+    new_cfg_data['group_b'] = {'regex_match': '3\.1\.[12]',
+                          'image': 'CumulusLinux-3.1.2-amd64.bin',
+                          'matches': {
+                                      'hw_model': ['cvx1000'],
+                                      'mac_address': ['0123456789012', '2109876543210']
+                                      }
+                         }
     try:
-        aztp_os_selector.match_hw_model(g_dev_data, new_cfg_data)
+        match = aztp_os_selector.match_hw_model(g_dev_data, new_cfg_data)
     except aztp_os_selector.HwMultiMatchError as e:
         pass
     assert isinstance(e, aztp_os_selector.HwMultiMatchError)
