@@ -406,30 +406,30 @@ class CumulusBootstrap:
 def main():
     cli_args = cli_parse()
     self_server = cli_args.server
-    boot = CumulusBootstrap(self_server, cli_args)
+    cboot = CumulusBootstrap(self_server, cli_args)
     if not os.path.isdir(cli_args.topdir):
-        boot.exit_results(dict(
+        cboot.exit_results(dict(
             ok=False,
             error_type='args',
             message='{} is not a directory'.format(cli_args.topdir)))
 
-    boot.log.info("bootstrap init-delay: {} seconds"
+    cboot.log.info("bootstrap init-delay: {} seconds"
                   .format(cli_args.init_delay))
 
-    boot.post_device_status(
+    cboot.post_device_status(
         target=cli_args.target,
         state='START',
         message='bootstrap started, waiting for device access')
 
     time.sleep(cli_args.init_delay)
-    dev = boot.wait_for_device(countdown=cli_args.reload_delay, poll_delay=10, msg='Waiting for device access')
+    dev = cboot.wait_for_device(countdown=cli_args.reload_delay, poll_delay=10, msg='Waiting for device access')
 
-    boot.log.info("proceeding with bootstrap")
+    cboot.log.info("proceeding with bootstrap")
 
-    boot.ensure_os_version(dev)
+    cboot.ensure_os_version(dev)
 
-    boot.log.info("bootstrap process finished")
-    boot.exit_results(dict(ok=True), dev=dev)
+    cboot.log.info("bootstrap process finished")
+    cboot.exit_results(dict(ok=True), dev=dev)
 
 if '__main__' == __name__:
     main()
