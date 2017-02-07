@@ -111,8 +111,8 @@ def match_hw_model(dev_data, cfg_data):
             raise HwNoMatchError()
     elif n_found > 1:
         raise HwMultiMatchError(
-            'matching both: {}'
-            .format([m.re.pattern for m in matches])
+            'matches multiple os-selector groups: {}'
+            .format(matches)
         )
 
     return item_match(matches[0], cfg_data[matches[0]])
