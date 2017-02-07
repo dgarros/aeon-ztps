@@ -7,6 +7,7 @@ import json
 import sys
 import copy
 from bin import aztp_os_selector
+from collections import namedtuple
 
 g_dev_data = {'os_name': 'cumulus-vx',
             'vendor': 'cumulus',
@@ -147,3 +148,55 @@ def test_match_hw_model_no_default():
     except aztp_os_selector.HwNoMatchError as e:
         pass
     assert isinstance(e, aztp_os_selector.HwNoMatchError)
+
+
+def test_match_hw_model_multi_match():
+    new_cfg_data = copy.deepcopy(g_cfg_data)
+    new_cfg_data['group_b'] = {'regex_match': '3\.1\.[12]',
+                          'image': 'CumulusLinux-3.1.2-amd64.bin',
+                          'matches': {
+                                      'hw_model': ['cvx1000'],
+                                      'mac_address': ['0123456789012', '2109876543210']
+                                      }
+                         }
+    try:
+        match = aztp_os_selector.match_hw_model(g_dev_data, new_cfg_data)
+    except aztp_os_selector.HwMultiMatchError as e:
+        pass
+    assert isinstance(e, aztp_os_selector.HwMultiMatchError)
+
+
+def test_match_os_version_regex_no_upgrade():
+    item_match = namedtuple('item_match', ['hw_match', 'data'])
+    hw_match = item_match('group_a', g_cfg_data['group_a'])
+    upgrade = aztp_os_selector.match_os_version(g_dev_data, hw_match.data)
+    assert not upgrade
+
+
+def test_match_os_version_exact_match_no_upgrade():
+    new_cfg_data = copy.deepcopy(g_cfg_data)
+    new_cfg_data['group_a'].pop('regex_match')
+    new_cfg_data['group_a']['exact_match'] = '3.1.1'
+    item_match = namedtuple('item_match', ['hw_match', 'data'])
+    hw_match = item_match('group_a', new_cfg_data['group_a'])
+    upgrade = aztp_os_selector.match_os_version(g_dev_data, hw_match.data)
+    assert not upgrade
+
+
+def test_match_os_version_regex_upgrade():
+    new_cfg_data = copy.deepcopy(g_cfg_data)
+    new_cfg_data['group_a']['regex_match'] = '3\.1\.[23]'
+    item_match = namedtuple('item_match', ['hw_match', 'data'])
+    hw_match = item_match('group_a', new_cfg_data['group_a'])
+    upgrade = aztp_os_selector.match_os_version(g_dev_data, hw_match.data)
+    assert upgrade == new_cfg_data['group_a']['image']
+
+
+def test_match_os_version_exact_match_upgrade():
+    new_cfg_data = copy.deepcopy(g_cfg_data)
+    new_cfg_data['group_a'].pop('regex_match')
+    new_cfg_data['group_a']['exact_match'] = '3.1.0'
+    item_match = namedtuple('item_match', ['hw_match', 'data'])
+    hw_match = item_match('group_a', new_cfg_data['group_a'])
+    upgrade = aztp_os_selector.match_os_version(g_dev_data, hw_match.data)
+    assert upgrade == new_cfg_data['group_a']['image']
