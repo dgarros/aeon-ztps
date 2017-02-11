@@ -57,16 +57,13 @@ def cli_parse(cmdargs=None):
 
     psr.add_argument(
         '--reload-delay',
-        dest='reload_delay',
         type=int, default=_DEFAULTS['reload-delay'],
         help="about of time/s to try to reconnect to device after reload")
 
     psr.add_argument(
         '--init-delay',
-        dest='init_delay',
         type=int, default=_DEFAULTS['init-delay'],
         help="amount of time/s to wait before starting the bootstrap process")
-
 
     # ##### -------------------------
     # ##### authentication
@@ -78,11 +75,11 @@ def cli_parse(cmdargs=None):
         '--user', help='login user-name')
 
     group.add_argument(
-        '-U', dest='env_user',
+        '-U', '--env_user',
         help='Username environment variable')
 
     group.add_argument(
-        '-P', dest='env_passwd',
+        '-P', '--env_passwd',
         required=True,
         help='Passwd environment variable')
 
