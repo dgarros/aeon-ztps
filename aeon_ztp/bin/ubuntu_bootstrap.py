@@ -7,13 +7,10 @@ import argparse
 import subprocess
 import logging
 import time
-import socket
 import requests
-import yaml
 
 from aeon.cumulus.device import Device
-from aeon.exceptions import ProbeError, LoginNotReadyError, UnauthorizedError
-from aeon.exceptions import ConfigError, CommandError
+from aeon.exceptions import UnauthorizedError
 
 _PROGNAME = 'ubuntu-bootstrap'
 _PROGVER = '0.0.1'
@@ -21,7 +18,7 @@ _OS_NAME = 'ubuntu'
 
 _DEFAULTS = {
     'init-delay': 5,
-    'reload-delay': 10*60,
+    'reload-delay': 10 * 60,
 }
 
 # ##### -----------------------------------------------------------------------
@@ -198,16 +195,15 @@ def wait_for_device(countdown, poll_delay):
 
             time.sleep(poll_delay)
 
-
     post_device_facts(dev)
     return dev
-
 
 # ##### -----------------------------------------------------------------------
 # #####
 # #####                           OS install process
 # #####
 # ##### -----------------------------------------------------------------------
+
 
 def get_required_os(dev):
     profile_dir = os.path.join(g_cli_args.topdir, 'etc', 'profiles', 'default', _OS_NAME)
@@ -310,6 +306,7 @@ def main():
 
     g_log.info("bootstrap process finished")
     exit_results(dict(ok=True), dev=dev)
+
 
 if '__main__' == __name__:
     main()
