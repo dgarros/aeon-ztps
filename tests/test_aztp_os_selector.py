@@ -5,7 +5,7 @@ import pytest
 import json
 import sys
 import copy
-from bin import aztp_os_selector
+from aeon_ztp.bin import aztp_os_selector
 from collections import namedtuple
 
 g_dev_data = {
