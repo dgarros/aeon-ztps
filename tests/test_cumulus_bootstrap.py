@@ -2,7 +2,7 @@ import pytest
 import sys
 import re
 import mock
-from bin import cumulus_bootstrap
+from aeon_ztp.bin import cumulus_bootstrap
 from StringIO import StringIO
 from aeon.cumulus.device import Device
 
@@ -57,7 +57,7 @@ def cli_args():
     return parse
 
 
-@mock.patch('bin.cumulus_bootstrap.requests.put')
+@mock.patch('aeon_ztp.bin.cumulus_bootstrap.requests.put')
 @pytest.fixture(scope='session')
 def cb_obj(mock_requests, cli_args):
     cb = cumulus_bootstrap.CumulusBootstrap(args['server'], cli_args)
@@ -91,7 +91,7 @@ def test_cumulus_bootstrap(cli_args, cb_obj):
     assert cli_args == cb_obj.cli_args
 
 
-@mock.patch('bin.cumulus_bootstrap.requests')
+@mock.patch('aeon_ztp.bin.cumulus_bootstrap.requests')
 def test_post_device_facts(mock_requests, device, cb_obj):
     cb_obj.post_device_facts(device)
     mock_requests.put.assert_called_with(json={
@@ -104,7 +104,7 @@ def test_post_device_facts(mock_requests, device, cb_obj):
         url='http://{}/api/devices/facts'.format(args['server']))
 
 
-@mock.patch('bin.cumulus_bootstrap.requests')
+@mock.patch('aeon_ztp.bin.cumulus_bootstrap.requests')
 def test_post_device_status(mock_requests, device, cb_obj):
     kw = {
         'dev': device,
@@ -122,7 +122,7 @@ def test_post_device_status(mock_requests, device, cb_obj):
         url='http://{}/api/devices/status'.format(args['server']))
 
 
-@mock.patch('bin.cumulus_bootstrap.CumulusBootstrap.post_device_status')
+@mock.patch('aeon_ztp.bin.cumulus_bootstrap.CumulusBootstrap.post_device_status')
 def test_exit_results(mock_post, cb_obj, device):
     kw = {
         'results': {'ok': True},
