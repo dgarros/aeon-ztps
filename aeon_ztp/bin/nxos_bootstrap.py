@@ -51,7 +51,7 @@ psr.add_argument(
 psr.add_argument(
     '--reload-delay',
     dest='reload_delay',
-    type=int, default=10*60,
+    type=int, default=10 * 60,
     help="about of time/s to try to reconnect to device after reload")
 
 psr.add_argument(
@@ -324,9 +324,9 @@ def do_os_install(dev, image_name):
 
     cmd = "nxos-installos --target {target} --server {server} " \
           "-U {u_env} -P {p_env} --image {image} --md5sum {md5sum}".format(
-            target=dev.target, server=g_cli_args.server,
-            u_env=g_cli_args.env_user, p_env=g_cli_args.env_passwd,
-            image=image_name, md5sum=md5sum)
+              target=dev.target, server=g_cli_args.server,
+              u_env=g_cli_args.env_user, p_env=g_cli_args.env_passwd,
+              image=image_name, md5sum=md5sum)
 
     if g_cli_args.logfile:
         cmd += ' --logfile %s' % g_cli_args.logfile
@@ -403,6 +403,7 @@ def main():
         dev = do_ensure_os_version(dev)
     g_log.info("bootstrap process finished")
     exit_results(dict(ok=True), dev=dev)
+
 
 if '__main__' == __name__:
     main()

@@ -8,7 +8,6 @@ import subprocess
 import logging
 import time
 import requests
-import yaml
 
 from aeon.eos.device import Device
 from aeon.exceptions import ProbeError, UnauthorizedError
@@ -49,7 +48,7 @@ psr.add_argument(
 psr.add_argument(
     '--reload-delay',
     dest='reload_delay',
-    type=int, default=10*60,
+    type=int, default=10 * 60,
     help="about of time/s to try to reconnect to device after reload")
 
 psr.add_argument(
@@ -303,7 +302,7 @@ def check_os_install(dev):
     try:
         results = json.loads(_stdout)
 
-    except Exception as exc:
+    except Exception:
         errmsg = 'Unable to load os-select output as JSON: {}'.format(_stdout)
         exit_results(dev=dev, results=dict(
             ok=False,
@@ -452,6 +451,7 @@ def main():
         do_ensure_os_version(dev)
     g_log.info("bootstrap process finished")
     exit_results(dict(ok=True), dev=dev)
+
 
 if '__main__' == __name__:
     main()

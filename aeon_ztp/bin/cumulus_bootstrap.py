@@ -23,7 +23,7 @@ _OS_NAME = 'cumulus'
 
 _DEFAULTS = {
     'init-delay': 5,
-    'reload-delay': 10*60,
+    'reload-delay': 10 * 60,
 }
 
 # ##### -----------------------------------------------------------------------
@@ -343,7 +343,7 @@ class CumulusBootstrap:
         if os_semver.major == 2:
             all_good, results = dev.api.execute([
                 'sudo /usr/cumulus/bin/cl-img-install -sf http://{server}/images/{os_name}/{image_name}'
-                    .format(server=self.cli_args.server, os_name=_OS_NAME, image_name=image_name)
+                .format(server=self.cli_args.server, os_name=_OS_NAME, image_name=image_name)
             ])
             if not all_good:
                 import pdb
@@ -423,9 +423,8 @@ def main():
 
     cboot.log.info("proceeding with bootstrap")
 
-
     if dev.facts['virtual']:
-       cboot.log.info('Virtual device. No OS upgrade necessary.')
+        cboot.log.info('Virtual device. No OS upgrade necessary.')
     else:
         cboot.ensure_os_version(dev)
     cboot.log.info("bootstrap process finished")

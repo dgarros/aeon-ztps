@@ -20,3 +20,4 @@ semver==2.7.3
 pexpect==4.0.1
 paramiko==1.17.2
 aeon-venos
+retrying
